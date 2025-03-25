@@ -1,19 +1,10 @@
-import { emit } from '../core/events';
-import type { Plugin, Note } from '../core/types/';
-import { registerCommand, app, setActiveNote } from '../core/state.svelte';
-
-// Utility functions
-function createNoteObject(content: string = '', parent?: string): Note {
-	return {
-		id: `note-${Date.now()}`,
-		content,
-		parent,
-		children: []
-	};
-}
+import { emit } from '$lib/core/events';
+import { app, setActiveNote } from '$lib/core/state.svelte';
+import type { Command, Note } from '$lib/core/types';
+import { createNoteObject } from './utils';
 
 // Create command definitions
-const createNoteCommand = {
+export const createNoteCommand: Command = {
 	id: 'notes.create',
 	name: 'Create Note',
 	description: 'Creates a new note',
@@ -39,8 +30,7 @@ const createNoteCommand = {
 		return note.id;
 	}
 };
-
-const updateNoteCommand = {
+export const updateNoteCommand: Command = {
 	id: 'notes.update',
 	name: 'Update Note',
 	description: 'Updates an existing note',
@@ -54,8 +44,7 @@ const updateNoteCommand = {
 		return true;
 	}
 };
-
-const setActiveNoteCommand = {
+export const setActiveNoteCommand: Command = {
 	id: 'notes.setActive',
 	name: 'Set Active Note',
 	description: 'Sets the currently active note',
@@ -66,18 +55,5 @@ const setActiveNoteCommand = {
 
 		setActiveNote(id);
 		return true;
-	}
-};
-
-// Export the plugin
-export const notesPlugin: Plugin = {
-	id: 'notes',
-	name: 'Notes',
-	description: 'Core notes functionality',
-	version: '1.0.0',
-	init: () => {
-		registerCommand(createNoteCommand);
-		registerCommand(updateNoteCommand);
-		registerCommand(setActiveNoteCommand);
 	}
 };
