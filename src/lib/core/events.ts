@@ -1,4 +1,5 @@
 import type { EventCallback } from './types';
+// i heard svelte has its' own event handler
 
 const events: Record<string, EventCallback[]> = {};
 

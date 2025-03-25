@@ -1,6 +1,7 @@
 <script lang="ts">
 	// TODO why is it in svelte? Is it worse if TS only?
 	import type { Plugin, Command, Note } from './types/index';
+	import { emit } from './events';
 
 	export const app = $state<{
 		plugins: Record<string, Plugin>;
@@ -33,5 +34,10 @@
 			return command.run(...args);
 		}
 		return null;
+	}
+
+	export function setActiveNote(id: string | null) {
+		app.activeNoteId = id;
+		emit('note:active', id);
 	}
 </script>
