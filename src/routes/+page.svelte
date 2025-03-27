@@ -8,10 +8,10 @@
 		getActiveNote
 	} from '$lib/core/state.svelte';
 	import { notesPlugin } from '$lib/plugins/notes';
-	import { vaultPlugin } from '$lib/plugins/vault';
+	import { vaultPlugin } from '$lib/plugins/vault/index.svelte.ts';
 	import type { Note } from '$lib/core/types';
 
-	let noteContent = '';
+	let noteContent: string = $state('');
 
 	onMount(() => {
 		// Register and initialize plugins

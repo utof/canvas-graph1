@@ -25,6 +25,18 @@ export function registerPlugin(plugin: Plugin) {
 	app.plugins[plugin.id] = plugin;
 }
 
+export function initPlugin(plugin: Plugin) {
+	try {
+		plugin.init();
+		emit('plugin:initialized', plugin.id);
+		return true;
+	} catch (error) {
+		console.error(`Failed to initialize plugin: ${plugin.id}`, error);
+		emit('plugin:error', plugin.id, error);
+		return false;
+	}
+}
+
 export function registerCommand(command: Command) {
 	app.commands[command.id] = command;
 	emit('command:registered', command.id);
