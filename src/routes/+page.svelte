@@ -1,98 +1,159 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		registerPlugin,
-		initPlugin,
-		runCommand,
-		app,
-		getActiveNote
-	} from '$lib/core/state.svelte';
-	import { notesPlugin } from '$lib/plugins/notes';
-	import { vaultPlugin } from '$lib/plugins/vault/index.svelte.ts';
-	import type { Note } from '$lib/core/types';
+	import { runCommand } from '$lib/core/state.svelte';
 
-	let noteContent: string = $state('');
+	interface VaultFile {
+		name: string;
+		handle: FileSystemFileHandle;
+		type: string;
+	}
 
-	onMount(() => {
-		// Register and initialize plugins
-		registerPlugin(notesPlugin);
-		registerPlugin(vaultPlugin);
+	let currentDir = 'canvas-vault';
+	let files: VaultFile[] = [];
+	let newFileName = '';
+	let isLoading = false;
+	let error: string | null = null;
 
-		initPlugin(notesPlugin);
-		initPlugin(vaultPlugin);
-
-		// Create a default note if there are no notes
-		if (Object.keys(app.notes).length === 0) {
-			runCommand('notes.create', 'Welcome to your new note!');
+	// Load files from vault
+	async function loadFiles(): Promise<void> {
+		isLoading = true;
+		try {
+			files = (await runCommand('vault.list')) as VaultFile[];
+			error = null;
+		} catch (err) {
+			error = 'Failed to load files';
+			console.error(err);
 		}
-	});
+		isLoading = false;
+	}
 
-	// Keep the textarea in sync with the active note
-	$effect(() => {
-		const active = getActiveNote();
-		if (active) {
-			noteContent = active.content;
+	// Change vault directory
+	async function changeDir(newDir: string): Promise<void> {
+		isLoading = true;
+		try {
+			await runCommand('vault.change-dir', newDir);
+			currentDir = newDir;
+			await loadFiles();
+		} catch (err) {
+			error = 'Failed to change directory';
+			console.error(err);
 		}
+		isLoading = false;
+	}
+
+	// Create new file
+	async function createFile(): Promise<void> {
+		if (!newFileName) return;
+
+		isLoading = true;
+		try {
+			await runCommand('vault.create', newFileName);
+			newFileName = '';
+			await loadFiles();
+		} catch (err) {
+			error = 'Failed to create file';
+			console.error(err);
+		}
+		isLoading = false;
+	}
+
+	// Delete file
+	async function deleteFile(name: string): Promise<void> {
+		if (!confirm(`Delete ${name}?`)) return;
+
+		isLoading = true;
+		try {
+			await runCommand('vault.delete', name);
+			await loadFiles();
+		} catch (err) {
+			error = 'Failed to delete file';
+			console.error(err);
+		}
+		isLoading = false;
+	}
+
+	// Initialize on mount
+	onMount(async () => {
+		await runCommand('vault.init');
+		await loadFiles();
 	});
 </script>
 
-<main class="container mx-auto p-4">
-	<h1 class="text-2xl font-bold mb-4">Information Manipulation Environment</h1>
+<div class="vault-manager">
+	<h2>Vault Manager</h2>
 
-	<div class="flex h-screen-minus-header">
-		<!-- Sidebar -->
-		<div class="w-64 border-r p-4">
-			<button
-				class="w-full bg-blue-500 text-white rounded px-4 py-2 mb-4"
-				onclick={() => runCommand('notes.create')}
-			>
-				New Note
-			</button>
+	{#if error}
+		<div class="error">{error}</div>
+	{/if}
 
-			<div class="mt-4">
-				<h3 class="text-sm font-semibold uppercase text-gray-500 mb-2">Notes</h3>
-				<ul class="space-y-1">
-					{#each Object.values(app.notes) as note: Note (note.id)}
-						<li>
-							<button
-								class="w-full text-left p-2 rounded hover:bg-gray-100"
-								class:bg-gray-200={note.id === app.activeNoteId}
-								onclick={() => runCommand('notes.setActive', note.id)}
-							>
-								{note.content.split('\n')[0] || 'Untitled'}
-							</button>
-						</li>
-					{/each}
-				</ul>
-			</div>
-		</div>
-
-		<!-- Main Content -->
-		<div class="flex-1 flex flex-col">
-			{#if getActiveNote()}
-				<textarea
-					class="flex-1 p-2 border-0"
-					bind:value={noteContent}
-					oninput={() => {
-						if (app.activeNoteId) {
-							runCommand('notes.update', app.activeNoteId, {
-								content: noteContent
-							});
-						}
-					}}
-					placeholder="Start writing..."
-				></textarea>
-			{:else}
-				<div class="flex h-full items-center justify-center text-gray-400">
-					Select a note or create a new one
-				</div>
-			{/if}
-		</div>
+	<div class="directory-controls">
+		<input bind:value={currentDir} placeholder="Directory name" />
+		<button on:click={() => changeDir(currentDir)}> Change Directory </button>
 	</div>
-</main>
+
+	<div class="file-creation">
+		<input bind:value={newFileName} placeholder="New file name" />
+		<button on:click={createFile}> Create File </button>
+	</div>
+
+	{#if isLoading}
+		<div>Loading...</div>
+	{:else}
+		<div class="file-list">
+			{#each files as file}
+				<div class="file-item">
+					<span>{file.name}</span>
+					<button class="delete-btn" on:click={() => deleteFile(file.name)}> X </button>
+				</div>
+			{/each}
+		</div>
+	{/if}
+</div>
 
 <style>
-	.h-screen-minus-header {
-		height: calc(100vh - 120px);
+	.vault-manager {
+		padding: 1rem;
+		max-width: 600px;
+		margin: 0 auto;
+	}
+
+	.error {
+		color: red;
+		margin-bottom: 1rem;
+	}
+
+	.directory-controls,
+	.file-creation {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	input {
+		flex-grow: 1;
+		padding: 0.5rem;
+	}
+
+	.file-list {
+		border: 1px solid #ddd;
+		border-radius: 4px;
+	}
+
+	.file-item {
+		display: flex;
+		justify-content: space-between;
+		padding: 0.5rem;
+		border-bottom: 1px solid #eee;
+	}
+
+	.file-item:last-child {
+		border-bottom: none;
+	}
+
+	.delete-btn {
+		color: red;
+		background: none;
+		border: none;
+		cursor: pointer;
 	}
 </style>

@@ -1,22 +1,72 @@
 // TODO why is it in svelte? Is it worse if TS only?
-import type { Plugin, Command, Note } from './types/index';
+import type { Plugin, Command } from './types/index';
 import { emit } from './events';
 
 export const app = $state<{
 	plugins: Record<string, Plugin>;
 	commands: Record<string, Command>;
-	activeNoteId: string | null;
-	notes: Record<string, Note>;
+	contextStack: Array<{
+		type: string;
+		id: string;
+		meta?: Record<string, unknown>;
+	}>;
+	dataStores: Record<string, Record<string, unknown>>;
+	vaultConfig: {
+		baseDir: string;
+		defaultExtensions: Record<string, string>;
+	};
 }>({
 	plugins: {},
 	commands: {},
-	activeNoteId: null,
-	notes: {}
-}); // TODO why state?
+	contextStack: [],
+	dataStores: {},
+	vaultConfig: {
+		baseDir: 'canvas-vault',
+		defaultExtensions: {
+			note: 'json',
+			flow: 'json',
+			image: 'png'
+		}
+	}
+});
 
-const activeNote = $derived(app.activeNoteId ? app.notes[app.activeNoteId] : null);
-export function getActiveNote() {
-	return activeNote;
+// New context system
+const currentContext = $derived(
+	app.contextStack.length > 0 ? app.contextStack[app.contextStack.length - 1] : null
+);
+
+export function getCurrentContext() {
+	return currentContext;
+}
+
+export function pushContext(type: string, id: string, meta?: Record<string, unknown>) {
+	app.contextStack.push({ type, id, meta });
+	emit('context:changed', { type, id, action: 'push' });
+}
+
+export function popContext() {
+	if (app.contextStack.length > 0) {
+		const popped = app.contextStack.pop();
+		emit('context:changed', {
+			type: popped?.type,
+			id: popped?.id,
+			action: 'pop'
+		});
+	}
+}
+
+export function getContextsOfType(type: string) {
+	return app.contextStack.filter((ctx) => ctx.type === type);
+}
+
+// Vault configuration helpers
+export function setVaultLocation(path: string) {
+	app.vaultConfig.baseDir = path;
+	emit('vault:location-changed', path);
+}
+
+export function getVaultLocation() {
+	return app.vaultConfig.baseDir;
 }
 
 // TODO why have these functions when the methods already exist in the interfaces?
@@ -50,9 +100,4 @@ export function runCommand(id: string, ...args: any[]) {
 		return command.run(...args);
 	}
 	return null;
-}
-
-export function setActiveNote(id: string | null) {
-	app.activeNoteId = id;
-	emit('note:active', id);
 }

@@ -3,5 +3,5 @@ export interface Command {
 	name?: string;
 	description: string;
 	run: (...args: any[]) => any;
-	contexts?: string[];
+	context?: string;
 }
